@@ -1,0 +1,93 @@
+@startuml
+title Bricks - Room Database ERD
+
+skinparam shadowing false
+skinparam linetype ortho
+hide circle
+
+entity "HabitEntity" as HabitEntity {
+  * habitId : String <<PK>>
+  --
+  * name : String <<unique active>>
+  * scheduleType : String
+  * selectedWeekdaysCsv : String
+  * reminderTimeMinutes : Int
+  imagePath : String?
+  * createdAtEpochMillis : Long
+  * isActive : Boolean
+}
+
+entity "HabitTaskEntity" as HabitTaskEntity {
+  * taskId : String <<PK>>
+  --
+  * habitId : String <<FK>>
+  * taskName : String
+  * sortOrder : Int
+}
+
+entity "HabitProgressEntity" as HabitProgressEntity {
+  * progressId : String <<PK>>
+  --
+  * habitId : String <<FK>>
+  * currentTier : String
+  * totalBricksRequired : Int
+  * completedBrickCount : Int
+  * missedGapCount : Int
+  * consecutiveMissedScheduledDays : Int
+  * currentWallStartDateEpochDay : Long
+  lastProcessedDateEpochDay : Long?
+  lastCompletedDateEpochDay : Long?
+  * tierStatus : String
+}
+
+entity "HabitDayRecordEntity" as HabitDayRecordEntity {
+  * recordId : String <<PK>>
+  --
+  * habitId : String <<FK>>
+  * dateEpochDay : Long
+  * wasScheduled : Boolean
+  * wasCompleted : Boolean
+  * wasMissed : Boolean
+  * wasProcessed : Boolean
+  brickIndex : Int?
+  * isGap : Boolean
+  * createdAtEpochMillis : Long
+}
+
+entity "TaskCompletionEntity" as TaskCompletionEntity {
+  * completionId : String <<PK>>
+  --
+  * habitId : String <<FK>>
+  * taskId : String <<FK>>
+  * dateEpochDay : Long
+  * isCompleted : Boolean
+  completedAtEpochMillis : Long?
+}
+
+HabitEntity ||--o{ HabitTaskEntity : "has tasks"
+HabitEntity ||--|| HabitProgressEntity : "has progress"
+HabitEntity ||--o{ HabitDayRecordEntity : "has day records"
+HabitEntity ||--o{ TaskCompletionEntity : "has completions"
+HabitTaskEntity ||--o{ TaskCompletionEntity : "completion records"
+
+note right of HabitEntity
+Recommended active-name uniqueness:
+unique index on name where isActive = true,
+or enforce in repository validation.
+Deleted habit names may be reused.
+end note
+
+note bottom of HabitProgressEntity
+currentTier:
+BRONZE, SILVER, GOLD
+
+tierStatus:
+ACTIVE, COMPLETED, RESET, REVERTED
+end note
+
+note bottom of HabitDayRecordEntity
+Stores enough state to avoid
+processing the same missed day twice.
+end note
+
+@enduml

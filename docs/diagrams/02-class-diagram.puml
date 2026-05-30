@@ -1,0 +1,203 @@
+@startuml
+title Bricks - Core Class / Domain UML
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+package "com.pck.bricks.core.model" {
+
+  enum ScheduleType {
+    DAILY
+    SPECIFIC_WEEKDAYS
+  }
+
+  enum TierType {
+    BRONZE
+    SILVER
+    GOLD
+  }
+
+  enum DayStatus {
+    NOT_SCHEDULED
+    SCHEDULED_PENDING
+    COMPLETED
+    MISSED
+    GAP_REPAIRED
+  }
+
+  enum TierStatus {
+    ACTIVE
+    COMPLETED
+    RESET
+    REVERTED
+  }
+
+  class Habit {
+    +habitId: String
+    +name: String
+    +scheduleType: ScheduleType
+    +selectedWeekdays: Set<DayOfWeek>
+    +reminderTime: LocalTime
+    +imagePath: String?
+    +createdAt: Instant
+    +isActive: Boolean
+  }
+
+  class HabitTask {
+    +taskId: String
+    +habitId: String
+    +taskName: String
+    +sortOrder: Int
+  }
+
+  class HabitProgress {
+    +progressId: String
+    +habitId: String
+    +currentTier: TierType
+    +totalBricksRequired: Int
+    +completedBrickCount: Int
+    +missedGapCount: Int
+    +consecutiveMissedScheduledDays: Int
+    +currentWallStartDate: LocalDate
+    +lastProcessedDate: LocalDate?
+    +lastCompletedDate: LocalDate?
+    +tierStatus: TierStatus
+  }
+
+  class HabitDayRecord {
+    +recordId: String
+    +habitId: String
+    +date: LocalDate
+    +wasScheduled: Boolean
+    +wasCompleted: Boolean
+    +wasMissed: Boolean
+    +wasProcessed: Boolean
+    +brickIndex: Int?
+    +isGap: Boolean
+    +createdAt: Instant
+  }
+
+  class TaskCompletionRecord {
+    +completionId: String
+    +habitId: String
+    +taskId: String
+    +date: LocalDate
+    +isCompleted: Boolean
+    +completedAt: Instant?
+  }
+}
+
+package "com.pck.bricks.data.repository" {
+  interface HabitRepository {
+    +getActiveHabits(): Flow<List<Habit>>
+    +getHabit(habitId: String): Flow<Habit?>
+    +createHabit(input: CreateHabitInput): Result<String>
+    +softDeleteHabit(habitId: String): Result<Unit>
+    +getTasksForHabit(habitId: String): Flow<List<HabitTask>>
+    +getProgress(habitId: String): Flow<HabitProgress?>
+    +getTodayTaskCompletions(habitId: String, date: LocalDate): Flow<List<TaskCompletionRecord>>
+    +setTaskCompleted(habitId: String, taskId: String, date: LocalDate): Result<Unit>
+    +lockCompletedDay(habitId: String, date: LocalDate): Result<Unit>
+    +recordMissedDay(habitId: String, date: LocalDate): Result<Unit>
+    +fortifyHabit(habitId: String): Result<Unit>
+  }
+}
+
+package "com.pck.bricks.features.rollover" {
+  class DailyRolloverProcessor {
+    +processPreviousScheduledDays(now: LocalDateTime): RolloverResult
+    +processHabitForDate(habitId: String, date: LocalDate): HabitRolloverResult
+  }
+
+  class MissedDayPolicyEngine {
+    +applyMiss(progress: HabitProgress, scheduleType: ScheduleType): MissPolicyResult
+  }
+
+  class TierTransitionEngine {
+    +canFortify(progress: HabitProgress): Boolean
+    +fortify(progress: HabitProgress): HabitProgress
+    +resetBronze(progress: HabitProgress): HabitProgress
+    +revertToSilver(progress: HabitProgress): HabitProgress
+    +completeTierIfReady(progress: HabitProgress): HabitProgress
+  }
+}
+
+package "com.pck.bricks.features.wall" {
+  class BrickLayoutCalculator {
+    +calculateLayout(tier: TierType, availableWidth: Float, availableHeight: Float): BrickLayout
+    +brickCountForTier(tier: TierType): Int
+  }
+
+  class WallRenderer {
+    +renderWall(progress: HabitProgress, layout: BrickLayout): WallRenderModel
+  }
+
+  class ImageWallMapper {
+    +mapImageToBrick(imagePath: String, brickIndex: Int, layout: BrickLayout): ImageFragment
+  }
+
+  class BrickProgressCalculator {
+    +nextBrickIndex(progress: HabitProgress): Int
+    +isWallComplete(progress: HabitProgress): Boolean
+    +visibleDividerAlpha(tier: TierType): Float
+  }
+}
+
+package "com.pck.bricks.features.notifications" {
+  interface ReminderScheduler {
+    +scheduleHabitReminder(habit: Habit): Unit
+    +cancelHabitReminder(habitId: String): Unit
+  }
+
+  interface MissedDayScheduler {
+    +scheduleMidnightProcessing(): Unit
+  }
+
+  class NotificationBuilder {
+    +buildReminder(habitName: String): Notification
+    +buildMissedDayNotice(habitName: String, result: MissPolicyResult): Notification
+  }
+}
+
+Habit "1" o-- "1..*" HabitTask
+Habit "1" o-- "1" HabitProgress
+Habit "1" o-- "0..*" HabitDayRecord
+HabitTask "1" o-- "0..*" TaskCompletionRecord
+Habit "1" o-- "0..*" TaskCompletionRecord
+
+Habit --> ScheduleType
+HabitProgress --> TierType
+HabitProgress --> TierStatus
+HabitDayRecord --> DayStatus
+
+DailyRolloverProcessor --> HabitRepository
+DailyRolloverProcessor --> MissedDayPolicyEngine
+DailyRolloverProcessor --> TierTransitionEngine
+DailyRolloverProcessor --> NotificationBuilder
+
+MissedDayPolicyEngine --> HabitProgress
+TierTransitionEngine --> HabitProgress
+
+WallRenderer --> BrickLayoutCalculator
+WallRenderer --> ImageWallMapper
+WallRenderer --> HabitProgress
+BrickProgressCalculator --> HabitProgress
+
+ReminderScheduler --> Habit
+NotificationBuilder --> MissedDayPolicyEngine
+
+note right of Habit
+Habit definition is stable in MVP.
+No editing after creation.
+Delete uses isActive = false.
+end note
+
+note bottom of HabitProgress
+Tier wall sizes:
+BRONZE = 30
+SILVER = 60
+GOLD = 90
+end note
+
+@enduml

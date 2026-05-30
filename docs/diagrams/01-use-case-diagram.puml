@@ -1,0 +1,64 @@
+@startuml
+title Bricks - Use Case Diagram
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor User
+actor "Android System Scheduler /\nNotification System" as AndroidScheduler
+
+rectangle "Bricks App" {
+  usecase "View Habit Library" as UC_ViewLibrary
+  usecase "Create Habit" as UC_CreateHabit
+  usecase "Open Habit" as UC_OpenHabit
+  usecase "Complete Tasks" as UC_CompleteTasks
+  usecase "Earn Brick" as UC_EarnBrick
+  usecase "View Wall" as UC_ViewWall
+  usecase "Fortify Habit" as UC_Fortify
+  usecase "Delete Habit" as UC_DeleteHabit
+  usecase "Receive Reminder" as UC_Reminder
+  usecase "Receive Missed-Day Notification" as UC_MissedNotification
+  usecase "Process Midnight Rollover" as UC_Rollover
+  usecase "Run Launch Reconciliation" as UC_LaunchReconcile
+  usecase "Map Uploaded Image to Wall" as UC_ImageMap
+}
+
+User --> UC_ViewLibrary
+User --> UC_CreateHabit
+User --> UC_OpenHabit
+User --> UC_CompleteTasks
+User --> UC_ViewWall
+User --> UC_Fortify
+User --> UC_DeleteHabit
+User --> UC_Reminder
+User --> UC_MissedNotification
+
+AndroidScheduler --> UC_Reminder
+AndroidScheduler --> UC_Rollover
+AndroidScheduler --> UC_MissedNotification
+
+UC_CompleteTasks --> UC_EarnBrick : <<includes>>
+UC_EarnBrick --> UC_ViewWall : <<includes>>
+UC_ViewWall --> UC_ImageMap : <<extends>>
+UC_Rollover --> UC_MissedNotification : <<extends>>
+UC_LaunchReconcile --> UC_Rollover : <<includes>>
+
+note right of UC_CreateHabit
+Validation:
+- name required
+- active name must be unique
+- schedule required
+- reminder time required
+- at least one task required
+- optional uploaded image
+end note
+
+note bottom of UC_CompleteTasks
+A brick is earned only when
+all tasks are completed within
+the scheduled local calendar day.
+No partial credit.
+end note
+
+@enduml

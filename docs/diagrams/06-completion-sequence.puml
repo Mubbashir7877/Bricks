@@ -1,0 +1,60 @@
+@startuml
+title Bricks - Complete Scheduled Habit Sequence
+
+skinparam shadowing false
+
+actor User
+participant "HabitViewScreen" as Screen
+participant "HabitViewModel" as VM
+participant "HabitRepository" as Repo
+participant "BrickProgressCalculator" as BrickCalc
+participant "TierTransitionEngine" as TierEngine
+participant "WallRenderer" as WallRenderer
+database "Room Database" as DB
+
+User -> Screen : Check task
+Screen -> VM : onTaskChecked(taskId)
+
+VM -> Repo : setTaskCompleted(habitId, taskId, today)
+Repo -> DB : Upsert TaskCompletionEntity
+DB --> Repo : Saved
+Repo --> VM : Result<Unit>
+
+VM -> Repo : getTodayTaskCompletions(habitId, today)
+Repo -> DB : Query task completions
+DB --> Repo : Completion records
+Repo --> VM : Completion records
+
+VM -> VM : Determine whether all tasks are complete
+
+alt all tasks complete
+  VM -> Repo : lockCompletedDay(habitId, today)
+  Repo -> DB : Create/Update HabitDayRecordEntity\nwasCompleted=true, wasProcessed=true
+  DB --> Repo : Saved
+
+  VM -> BrickCalc : nextBrickIndex(progress)
+  BrickCalc --> VM : brickIndex
+
+  VM -> Repo : increment brick count and save brickIndex
+  Repo -> DB : Update HabitProgressEntity\nUpdate HabitDayRecordEntity.brickIndex
+  DB --> Repo : Saved
+
+  VM -> TierEngine : completeTierIfReady(progress)
+  TierEngine --> VM : updated progress
+
+  VM -> WallRenderer : renderWall(updatedProgress, layout)
+  WallRenderer --> VM : WallRenderModel
+
+  VM -> Screen : State = CompletedLocked\nPlay brick animation once\nShow wall
+else still incomplete
+  VM -> Screen : State = ChecklistInProgress
+end
+
+note right of VM
+After completion:
+- task checking is locked
+- user cannot uncheck
+- animation does not replay later same day
+end note
+
+@enduml

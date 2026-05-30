@@ -1,0 +1,81 @@
+@startuml
+title Bricks - Habit Tier State Machine
+
+skinparam shadowing false
+
+[*] --> ActiveBronze : Create habit
+
+state ActiveBronze {
+  [*] --> BronzeInProgress
+
+  BronzeInProgress --> BronzeInProgress : Complete scheduled day /\nlay brick
+  BronzeInProgress --> BronzeInProgress : Miss scheduled day /\nadd gap if within allowance
+  BronzeInProgress --> ResetBronze : Exceed Bronze miss policy
+  BronzeInProgress --> BronzeCompleted : completedBrickCount + repaired gaps = 30
+}
+
+BronzeCompleted --> ActiveSilver : Fortify /\nwall expands 30 -> 60
+
+state ActiveSilver {
+  [*] --> SilverInProgress
+
+  SilverInProgress --> SilverInProgress : Complete scheduled day /\nlay brick
+  SilverInProgress --> SilverInProgress : First allowed miss /\nadd gap
+  SilverInProgress --> ResetSilver : Exceed Silver miss threshold
+  SilverInProgress --> ActiveBronze : After prior miss,\n3 consecutive scheduled misses /\nrevert to Bronze
+  SilverInProgress --> SilverCompleted : completedBrickCount + repaired gaps = 60
+}
+
+SilverCompleted --> ActiveGold : Fortify /\nwall expands 60 -> 90
+
+state ActiveGold {
+  [*] --> GoldInProgress
+
+  GoldInProgress --> GoldInProgress : Complete scheduled day /\nlay brick
+  GoldInProgress --> ActiveSilver : Any missed scheduled day /\nrevert to Silver
+  GoldInProgress --> GoldCompleted : completedBrickCount = 90
+}
+
+GoldCompleted --> GoldCompleted : Habit fully fortified
+
+ResetBronze --> ActiveBronze : Restart clean Bronze wall
+ResetSilver --> ActiveSilver : Restart Silver tier
+
+ActiveBronze --> Deleted : Delete habit
+BronzeCompleted --> Deleted : Delete habit
+ActiveSilver --> Deleted : Delete habit
+SilverCompleted --> Deleted : Delete habit
+ActiveGold --> Deleted : Delete habit
+GoldCompleted --> Deleted : Delete habit
+
+Deleted --> [*]
+
+note right of ActiveBronze
+Daily Bronze:
+- up to 2 consecutive scheduled misses allowed
+- misses create visible gaps
+- gaps repaired by extra scheduled completions
+- exceeding policy resets Bronze
+end note
+
+note right of ActiveSilver
+Daily Silver:
+- 1 scheduled miss allowed
+- exceeding threshold resets Silver
+- after one miss, 3 consecutive scheduled misses revert to Bronze
+end note
+
+note right of ActiveGold
+Daily Gold:
+- no misses allowed
+- any missed scheduled day reverts to Silver
+end note
+
+note bottom
+Specific-weekday habits:
+non-scheduled days do not count.
+Any missed scheduled weekday triggers
+the relevant tier reset/reversion immediately.
+end note
+
+@enduml

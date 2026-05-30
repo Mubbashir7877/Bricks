@@ -1,0 +1,88 @@
+@startuml
+title Bricks - Main User Flow
+
+skinparam shadowing false
+
+start
+
+:Launch Bricks;
+:Run launch reconciliation for missed scheduled days;
+:Open Library View;
+
+if (Any active habits?) then (yes)
+  :Show active habit card grid;
+else (no)
+  :Show empty Library View;
+endif
+
+if (User taps Create Habit?) then (yes)
+  :Open Create Habit screen;
+  :Enter habit name;
+  :Choose schedule type;
+  if (Specific weekdays?) then (yes)
+    :Select weekdays;
+  else (daily)
+    :Use daily schedule;
+  endif
+  :Choose one reminder time;
+  :Add one or more tasks;
+  if (Upload image?) then (yes)
+    :Copy image into app-private storage;
+  else (no)
+    :Use default red brick wall;
+  endif
+
+  if (Validation passes?) then (yes)
+    :Save Habit, Tasks, Progress in Room;
+    :Schedule reminder;
+    :Return to Library View;
+  else (no)
+    :Show validation errors;
+    :Stay on Create Habit screen;
+  endif
+endif
+
+if (User selects habit card?) then (yes)
+  :Open centered Habit View;
+  :Show checklist before completion;
+
+  while (Tasks remain incomplete?)
+    :User checks task;
+  endwhile
+
+  :All tasks complete;
+  :Lock task completion for the day;
+  :Create completed day record;
+  :Increment completed brick count;
+  :Play brick-laying animation once;
+  :Show wall view;
+
+  if (Current tier wall complete?) then (yes)
+    :Show tier border and label;
+    if (Tier is not Gold?) then (yes)
+      :Show Fortify button;
+      if (User taps Fortify?) then (yes)
+        :Expand wall to next tier;
+        :Preserve completed bricks;
+        :Continue habit;
+      endif
+    else (Gold)
+      :Show LifeStyle completed state;
+    endif
+  endif
+endif
+
+if (User deletes habit?) then (yes)
+  :Show permanent deletion confirmation;
+  if (User confirms?) then (yes)
+    :Soft-delete habit with isActive = false;
+    :Cancel reminder;
+    :Remove habit from Library View;
+  else (no)
+    :Return to Habit View;
+  endif
+endif
+
+stop
+
+@enduml

@@ -1,0 +1,166 @@
+@startuml
+title Bricks - Phase 1 Package Architecture
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+
+package "com.pck.bricks" {
+
+  package "core" {
+    package "model" {
+      class Habit
+      class HabitTask
+      class HabitProgress
+      class HabitDayRecord
+      class TaskCompletionRecord
+      enum ScheduleType
+      enum TierType
+      enum DayStatus
+    }
+
+    package "time" {
+      class LocalDateProvider
+      class ScheduledDayCalculator
+    }
+
+    package "ui" {
+      class BricksTheme
+      class UiText
+    }
+
+    package "navigation" {
+      class BricksNavState
+      enum Screen
+    }
+
+    package "util" {
+      class Result
+      class ValidationError
+    }
+  }
+
+  package "data" {
+    package "entity" {
+      class HabitEntity
+      class HabitTaskEntity
+      class HabitProgressEntity
+      class HabitDayRecordEntity
+      class TaskCompletionEntity
+    }
+
+    package "dao" {
+      interface HabitDao
+      interface HabitTaskDao
+      interface HabitProgressDao
+      interface HabitDayRecordDao
+      interface TaskCompletionDao
+    }
+
+    package "db" {
+      class BricksDatabase
+    }
+
+    package "mapper" {
+      class HabitMapper
+      class ProgressMapper
+      class DayRecordMapper
+    }
+
+    package "repository" {
+      interface HabitRepository
+      class LocalHabitRepository
+    }
+  }
+
+  package "features" {
+    package "library" {
+      class LibraryScreen
+      class LibraryViewModel
+      package "components" {
+        class HabitCard
+        class LibraryGrid
+      }
+    }
+
+    package "creation" {
+      class CreateHabitScreen
+      class CreateHabitViewModel
+      package "components" {
+        class TaskListBuilder
+        class ScheduleSelector
+        class ReminderTimePicker
+        class ImagePickerRow
+      }
+    }
+
+    package "habit" {
+      class HabitViewScreen
+      class HabitViewModel
+      package "components" {
+        class TaskChecklist
+        class HabitOverlay
+        class DeleteHabitDialog
+      }
+    }
+
+    package "wall" {
+      class WallCanvas
+      class WallRenderer
+      class BrickLayoutCalculator
+      class ImageWallMapper
+      class BrickProgressCalculator
+      package "animation" {
+        class BrickLayAnimation
+      }
+    }
+
+    package "notifications" {
+      class ReminderScheduler
+      class MissedDayScheduler
+      class NotificationBuilder
+      package "workers" {
+        class ReminderWorker
+        class MidnightRolloverWorker
+      }
+    }
+
+    package "rollover" {
+      class DailyRolloverProcessor
+      class MissedDayPolicyEngine
+      class TierTransitionEngine
+    }
+  }
+
+  package "future.widget" {
+    class WidgetPlaceholder
+  }
+}
+
+LibraryViewModel --> HabitRepository
+CreateHabitViewModel --> HabitRepository
+HabitViewModel --> HabitRepository
+HabitViewModel --> BrickProgressCalculator
+HabitViewModel --> TierTransitionEngine
+HabitViewModel --> WallRenderer
+
+LocalHabitRepository --> BricksDatabase
+BricksDatabase --> HabitDao
+BricksDatabase --> HabitTaskDao
+BricksDatabase --> HabitProgressDao
+BricksDatabase --> HabitDayRecordDao
+BricksDatabase --> TaskCompletionDao
+
+DailyRolloverProcessor --> HabitRepository
+DailyRolloverProcessor --> MissedDayPolicyEngine
+DailyRolloverProcessor --> TierTransitionEngine
+DailyRolloverProcessor --> NotificationBuilder
+
+ReminderScheduler --> ReminderWorker
+MissedDayScheduler --> MidnightRolloverWorker
+MidnightRolloverWorker --> DailyRolloverProcessor
+
+WallRenderer --> BrickLayoutCalculator
+WallRenderer --> ImageWallMapper
+
+@enduml

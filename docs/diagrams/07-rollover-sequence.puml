@@ -1,0 +1,77 @@
+@startuml
+title Bricks - Midnight / Launch Rollover Sequence
+
+skinparam shadowing false
+
+actor "Android Scheduler" as Scheduler
+actor "App Launch" as AppLaunch
+participant "MidnightRolloverWorker" as Worker
+participant "DailyRolloverProcessor" as Processor
+participant "HabitRepository" as Repo
+participant "ScheduledDayCalculator" as ScheduleCalc
+participant "MissedDayPolicyEngine" as MissPolicy
+participant "TierTransitionEngine" as TierEngine
+participant "NotificationBuilder" as NotificationBuilder
+database "Room Database" as DB
+
+Scheduler -> Worker : Run near midnight
+AppLaunch -> Processor : Reconcile missed days on launch
+
+Worker -> Processor : processPreviousScheduledDays(now)
+
+Processor -> Repo : getActiveHabits()
+Repo -> DB : Query active habits
+DB --> Repo : Active habits
+Repo --> Processor : Active habits
+
+loop each active habit
+  Processor -> ScheduleCalc : wasScheduled(habit, previousDate)
+  ScheduleCalc --> Processor : true/false
+
+  alt not scheduled
+    Processor -> Repo : ensureDayRecord(previousDate, NOT_SCHEDULED)
+  else scheduled
+    Processor -> Repo : getDayRecord(habitId, previousDate)
+    Repo -> DB : Query day record
+    DB --> Repo : HabitDayRecordEntity?
+    Repo --> Processor : Day record
+
+    alt already processed
+      Processor -> Processor : Skip to prevent double processing
+    else completed
+      Processor -> Repo : markProcessed(previousDate)
+      Repo -> DB : Update wasProcessed=true
+    else incomplete scheduled day
+      Processor -> Repo : markMissed(habitId, previousDate)
+      Repo -> DB : Save missed day record
+
+      Processor -> Repo : getProgress(habitId)
+      Repo -> DB : Query progress
+      DB --> Repo : HabitProgressEntity
+      Repo --> Processor : HabitProgress
+
+      Processor -> MissPolicy : applyMiss(progress, scheduleType)
+      MissPolicy --> Processor : MissPolicyResult
+
+      Processor -> TierEngine : apply reset/revert/update from result
+      TierEngine --> Processor : Updated progress
+
+      Processor -> Repo : saveProgress(updatedProgress)
+      Repo -> DB : Update HabitProgressEntity
+
+      Processor -> NotificationBuilder : buildMissedDayNotice(habitName, result)
+      NotificationBuilder --> Processor : Notification
+      Processor -> Worker : Send notification
+    end
+  end
+end
+
+Processor --> Worker : RolloverResult
+
+note bottom
+Rollover must also run at app launch
+because Android may delay background work,
+the phone may be off, or midnight work may not run exactly on time.
+end note
+
+@enduml
