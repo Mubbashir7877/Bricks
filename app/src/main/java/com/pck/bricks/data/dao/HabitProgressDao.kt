@@ -22,4 +22,7 @@ interface HabitProgressDao {
 
     @Update
     suspend fun update(progress: HabitProgressEntity)
+
+    @Query("SELECT * FROM habit_progress WHERE habitId IN (SELECT habitId FROM habits WHERE isActive = 1)")
+    fun observeAllActiveProgress(): Flow<List<HabitProgressEntity>>
 }

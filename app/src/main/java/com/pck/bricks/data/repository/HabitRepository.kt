@@ -20,12 +20,14 @@ interface HabitRepository {
     suspend fun getTasksOnce(habitId: String): List<HabitTask>
 
     fun getProgress(habitId: String): Flow<HabitProgress?>
+    fun getAllActiveProgress(): Flow<List<HabitProgress>>
     suspend fun getProgressOnce(habitId: String): HabitProgress?
     suspend fun saveProgress(progress: HabitProgress)
 
     suspend fun getActiveHabitsOnce(): List<Habit>
 
     fun getTodayTaskCompletions(habitId: String, date: LocalDate): Flow<List<TaskCompletionRecord>>
+    suspend fun getTodayTaskCompletionsOnce(habitId: String, date: LocalDate): List<TaskCompletionRecord>
     suspend fun setTaskCompleted(habitId: String, taskId: String, date: LocalDate): Result<Unit>
 
     suspend fun lockCompletedDay(habitId: String, date: LocalDate, brickIndex: Int): Result<Unit>

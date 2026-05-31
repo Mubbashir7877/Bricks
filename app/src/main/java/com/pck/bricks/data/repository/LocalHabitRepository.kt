@@ -102,6 +102,9 @@ class LocalHabitRepository(
     override fun getProgress(habitId: String): Flow<HabitProgress?> =
         habitProgressDao.observeProgress(habitId).map { it?.let(ProgressMapper::toDomain) }
 
+    override fun getAllActiveProgress(): Flow<List<HabitProgress>> =
+        habitProgressDao.observeAllActiveProgress().map { list -> list.map(ProgressMapper::toDomain) }
+
     override suspend fun getProgressOnce(habitId: String): HabitProgress? =
         habitProgressDao.getProgress(habitId)?.let(ProgressMapper::toDomain)
 
@@ -115,6 +118,9 @@ class LocalHabitRepository(
     override fun getTodayTaskCompletions(habitId: String, date: LocalDate): Flow<List<TaskCompletionRecord>> =
         taskCompletionDao.observeCompletionsForDay(habitId, date.toEpochDay())
             .map { list -> list.map(DayRecordMapper::completionToDomain) }
+
+    override suspend fun getTodayTaskCompletionsOnce(habitId: String, date: LocalDate): List<TaskCompletionRecord> =
+        taskCompletionDao.getCompletionsForDay(habitId, date.toEpochDay()).map(DayRecordMapper::completionToDomain)
 
     override suspend fun setTaskCompleted(
         habitId: String,

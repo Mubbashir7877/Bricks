@@ -8,10 +8,16 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
+data class MissedDayNotification(
+    val habitName: String,
+    val policyResult: MissPolicyResult
+)
+
 data class HabitRolloverResult(
     val habitId: String,
     val processedDates: List<LocalDate>,
-    val missedDates: List<LocalDate>
+    val missedDates: List<LocalDate>,
+    val notifications: List<MissedDayNotification> = emptyList()
 )
 
 data class RolloverResult(val habitResults: List<HabitRolloverResult>)
@@ -24,10 +30,6 @@ class DailyRolloverProcessor(
     private val dateProvider: LocalDateProvider
 ) {
 
-    /**
-     * Called at midnight (via WorkManager) and on every app launch.
-     * Reconciles any scheduled days that elapsed without being marked processed.
-     */
     suspend fun processPreviousScheduledDays(): RolloverResult {
         val today = dateProvider.today()
         val habits = habitRepository.getActiveHabitsOnce()
@@ -40,6 +42,7 @@ class DailyRolloverProcessor(
     suspend fun processHabitForDate(habitId: String, today: LocalDate): HabitRolloverResult {
         val processed = mutableListOf<LocalDate>()
         val missed = mutableListOf<LocalDate>()
+        val notifications = mutableListOf<MissedDayNotification>()
 
         val habit = habitRepository.getActiveHabitsOnce().firstOrNull { it.habitId == habitId }
             ?: return HabitRolloverResult(habitId, processed, missed)
@@ -60,15 +63,11 @@ class DailyRolloverProcessor(
                     // Already handled — skip
                 }
                 existingRecord?.wasCompleted == true -> {
-                    // Completed but not yet marked processed
-                    habitRepository.upsertDayRecord(
-                        existingRecord.copy(wasProcessed = true)
-                    )
+                    habitRepository.upsertDayRecord(existingRecord.copy(wasProcessed = true))
                     currentProgress = currentProgress.copy(lastProcessedDate = date)
                     processed += date
                 }
                 else -> {
-                    // Unprocessed scheduled day with no completion → missed
                     val gapIndex = tierTransitionEngine.nextBrickIndex(currentProgress)
                     habitRepository.upsertDayRecord(
                         HabitDayRecord(
@@ -91,10 +90,11 @@ class DailyRolloverProcessor(
                         date
                     )
                     currentProgress = when (policyResult) {
-                        is MissPolicyResult.AddGap -> policyResult.updatedProgress
+                        is MissPolicyResult.AddGap    -> policyResult.updatedProgress
                         is MissPolicyResult.ResetTier -> policyResult.updatedProgress
                         is MissPolicyResult.RevertTier -> policyResult.updatedProgress
                     }
+                    notifications += MissedDayNotification(habit.name, policyResult)
                     missed += date
                 }
             }
@@ -104,6 +104,6 @@ class DailyRolloverProcessor(
             habitRepository.saveProgress(currentProgress)
         }
 
-        return HabitRolloverResult(habitId, processed, missed)
+        return HabitRolloverResult(habitId, processed, missed, notifications)
     }
 }
