@@ -76,7 +76,7 @@ class HabitViewModel(
         val isScheduled = scheduledDayCalculator.isScheduled(habit, today)
 
         val layout = BrickLayoutCalculator().calculateLayout(progress.currentTier)
-        val wallModel = wallRenderer.renderWall(progress, layout, newlyAddedIndex = animIndex)
+        val wallModel = wallRenderer.renderWall(progress, layout, newlyAddedIndex = animIndex, imagePath = habit.imagePath)
 
         HabitViewUiState(
             habit = habit,

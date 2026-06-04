@@ -11,7 +11,8 @@ data class WallRenderModel(
     val bricks: List<BrickRenderData>,
     val layout: BrickLayout,
     val tier: TierType,
-    val newlyAddedIndex: Int? = null
+    val newlyAddedIndex: Int? = null,
+    val imagePath: String? = null
 )
 
 class WallRenderer {
@@ -19,7 +20,8 @@ class WallRenderer {
     fun renderWall(
         progress: HabitProgress,
         layout: BrickLayout,
-        newlyAddedIndex: Int? = null
+        newlyAddedIndex: Int? = null,
+        imagePath: String? = null
     ): WallRenderModel {
         val bricks = (0 until layout.totalBricks).map { index ->
             val state = when {
@@ -29,6 +31,6 @@ class WallRenderer {
             }
             BrickRenderData(index, state)
         }
-        return WallRenderModel(bricks, layout, progress.currentTier, newlyAddedIndex)
+        return WallRenderModel(bricks, layout, progress.currentTier, newlyAddedIndex, imagePath)
     }
 }
