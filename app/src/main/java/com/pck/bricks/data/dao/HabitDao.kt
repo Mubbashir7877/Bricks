@@ -24,4 +24,7 @@ interface HabitDao {
 
     @Query("UPDATE habits SET isActive = 0 WHERE habitId = :habitId")
     suspend fun softDelete(habitId: String)
+
+    @Query("UPDATE habits SET imagePath = :imagePath WHERE habitId = :habitId")
+    suspend fun updateImagePath(habitId: String, imagePath: String?)
 }

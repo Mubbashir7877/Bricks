@@ -215,6 +215,10 @@ class LocalHabitRepository(
         habitDayRecordDao.upsert(DayRecordMapper.toEntity(record))
     }
 
+    override suspend fun updateHabitImage(habitId: String, imagePath: String?) {
+        habitDao.updateImagePath(habitId, imagePath)
+    }
+
     private fun bricksForTier(tier: TierType): Int = when (tier) {
         TierType.BRONZE -> 30
         TierType.SILVER -> 60

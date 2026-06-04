@@ -1,5 +1,9 @@
 package com.pck.bricks.features.habit
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,10 +13,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -45,6 +52,7 @@ import com.pck.bricks.core.model.HabitProgress
 import com.pck.bricks.core.model.HabitTask
 import com.pck.bricks.core.model.TierStatus
 import com.pck.bricks.core.model.TierType
+import com.pck.bricks.features.wall.BrickLayoutCalculator
 import com.pck.bricks.features.wall.WallCanvas
 import com.pck.bricks.features.wall.WallRenderModel
 
@@ -64,6 +72,10 @@ fun HabitViewScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.onImageSelected(it) } }
 
     if (showDeleteDialog && uiState.habit != null) {
         AlertDialog(
@@ -116,7 +128,12 @@ fun HabitViewScreen(
                 else -> HabitContent(
                     uiState = uiState,
                     onTaskChecked = viewModel::onTaskChecked,
-                    onFortify = viewModel::onFortifyClicked
+                    onFortify = viewModel::onFortifyClicked,
+                    onPickImage = {
+                        imagePickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
                 )
             }
         }
@@ -127,7 +144,8 @@ fun HabitViewScreen(
 private fun HabitContent(
     uiState: HabitViewUiState,
     onTaskChecked: (String) -> Unit,
-    onFortify: () -> Unit
+    onFortify: () -> Unit,
+    onPickImage: () -> Unit
 ) {
     val progress = uiState.progress ?: return
     Column(
@@ -153,7 +171,8 @@ private fun HabitContent(
                         progress = progress,
                         tasks = uiState.tasks,
                         wallModel = wallModel,
-                        onFortify = onFortify
+                        onFortify = onFortify,
+                        onPickImage = onPickImage
                     )
                 }
             }
@@ -165,7 +184,7 @@ private fun HabitContent(
                 )
                 Spacer(Modifier.height(16.dp))
                 uiState.wallRenderModel?.let { wallModel ->
-                    WallCanvas(wallModel = wallModel, modifier = Modifier.fillMaxWidth())
+                    WallWithImageButton(wallModel = wallModel, onPickImage = onPickImage)
                 }
             }
         }
@@ -186,8 +205,9 @@ private fun TierHeader(progress: HabitProgress) {
             colors = SuggestionChipDefaults.suggestionChipColors(containerColor = tierColor.copy(alpha = 0.15f)),
             border = SuggestionChipDefaults.suggestionChipBorder(enabled = true, borderColor = tierColor)
         )
+        val total = BrickLayoutCalculator().brickCountForTier(progress.currentTier)
         Text(
-            "${progress.completedBrickCount + progress.missedGapCount} / ${progress.totalBricksRequired} bricks",
+            "${progress.completedBrickCount + progress.missedGapCount} / $total bricks",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -224,13 +244,41 @@ private fun TaskChecklist(
 }
 
 @Composable
+private fun WallWithImageButton(
+    wallModel: WallRenderModel,
+    onPickImage: () -> Unit
+) {
+    Box {
+        WallCanvas(wallModel = wallModel, modifier = Modifier.fillMaxWidth())
+        IconButton(
+            onClick = onPickImage,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(6.dp)
+                .size(32.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                    shape = CircleShape
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Default.AddPhotoAlternate,
+                contentDescription = "Add or replace image",
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun CompletedView(
     progress: HabitProgress,
     tasks: List<HabitTask>,
     wallModel: WallRenderModel,
-    onFortify: () -> Unit
+    onFortify: () -> Unit,
+    onPickImage: () -> Unit
 ) {
-    WallCanvas(wallModel = wallModel, modifier = Modifier.fillMaxWidth())
+    WallWithImageButton(wallModel = wallModel, onPickImage = onPickImage)
     Spacer(Modifier.height(16.dp))
 
     if (progress.tierStatus == TierStatus.COMPLETED) {

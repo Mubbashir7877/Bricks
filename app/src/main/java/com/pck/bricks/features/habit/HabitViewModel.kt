@@ -1,5 +1,7 @@
 package com.pck.bricks.features.habit
 
+import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -17,6 +19,7 @@ import com.pck.bricks.features.wall.BrickLayoutCalculator
 import com.pck.bricks.features.wall.BrickProgressCalculator
 import com.pck.bricks.features.wall.WallRenderModel
 import com.pck.bricks.features.wall.WallRenderer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +27,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.LocalDate
+import java.util.UUID
 
 enum class HabitScreenState { Checklist, CompletedLocked, NotScheduled }
 
@@ -40,6 +46,7 @@ data class HabitViewUiState(
 
 class HabitViewModel(
     private val habitId: String,
+    private val application: Application,
     private val habitRepository: HabitRepository,
     private val tierTransitionEngine: TierTransitionEngine,
     private val scheduledDayCalculator: ScheduledDayCalculator,
@@ -115,6 +122,26 @@ class HabitViewModel(
         }
     }
 
+    fun onImageSelected(uri: Uri) {
+        viewModelScope.launch {
+            val oldPath = uiState.value.habit?.imagePath
+            val newPath = copyImageToPrivateStorage(uri) ?: return@launch
+            oldPath?.let { runCatching { File(it).delete() } }
+            habitRepository.updateHabitImage(habitId, newPath)
+        }
+    }
+
+    private suspend fun copyImageToPrivateStorage(uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val dir = File(application.filesDir, "habit_images").also { it.mkdirs() }
+            val dest = File(dir, "habit_${UUID.randomUUID()}.jpg")
+            application.contentResolver.openInputStream(uri)?.use { input ->
+                dest.outputStream().use { output -> input.copyTo(output) }
+            }
+            dest.absolutePath
+        }.getOrNull()
+    }
+
     private suspend fun lockDay() {
         val progress = habitRepository.getProgressOnce(habitId) ?: return
         val brickIndex = brickProgressCalculator.nextBrickIndex(progress)
@@ -136,6 +163,7 @@ class HabitViewModel(
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as BricksApp
                 HabitViewModel(
                     habitId = habitId,
+                    application = app,
                     habitRepository = app.habitRepository,
                     tierTransitionEngine = app.tierTransitionEngine,
                     scheduledDayCalculator = app.scheduledDayCalculator,

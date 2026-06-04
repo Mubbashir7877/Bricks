@@ -1,5 +1,7 @@
 package com.pck.bricks.features.creation
 
+import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -10,6 +12,7 @@ import com.pck.bricks.core.model.CreateHabitInput
 import com.pck.bricks.core.model.ScheduleType
 import com.pck.bricks.data.repository.HabitRepository
 import com.pck.bricks.features.notifications.ReminderScheduler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,8 +20,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.DayOfWeek
 import java.time.LocalTime
+import java.util.UUID
 
 data class CreateHabitFormState(
     val name: String = "",
@@ -27,7 +33,7 @@ data class CreateHabitFormState(
     val reminderHour: Int = 8,
     val reminderMinute: Int = 0,
     val tasks: List<String> = listOf(""),
-    val imagePath: String? = null,
+    val selectedImageUri: Uri? = null,
     val nameError: String? = null,
     val weekdaysError: String? = null,
     val tasksError: String? = null,
@@ -39,6 +45,7 @@ sealed class CreateHabitEvent {
 }
 
 class CreateHabitViewModel(
+    private val application: Application,
     private val habitRepository: HabitRepository,
     private val reminderScheduler: ReminderScheduler
 ) : ViewModel() {
@@ -89,12 +96,30 @@ class CreateHabitViewModel(
         }
     }
 
+    fun onImageSelected(uri: Uri) {
+        _formState.update { it.copy(selectedImageUri = uri) }
+    }
+
+    fun onRemoveImage() {
+        _formState.update { it.copy(selectedImageUri = null) }
+    }
+
     fun onSubmit() {
         val state = _formState.value
-        if (!validate(state)) return
+        if (!validateSync(state)) return
 
         viewModelScope.launch {
             _formState.update { it.copy(isSaving = true) }
+
+            // Uniqueness check (spec §6.1: duplicate active names not allowed)
+            val existingNames = habitRepository.getActiveHabitsOnce()
+                .map { it.name.trim().lowercase() }
+            if (state.name.trim().lowercase() in existingNames) {
+                _formState.update { it.copy(isSaving = false, nameError = "A habit with this name already exists") }
+                return@launch
+            }
+
+            val imagePath = state.selectedImageUri?.let { copyImageToPrivateStorage(it) }
 
             val input = CreateHabitInput(
                 name = state.name.trim(),
@@ -102,7 +127,7 @@ class CreateHabitViewModel(
                 selectedWeekdays = state.selectedWeekdays,
                 reminderTime = LocalTime.of(state.reminderHour, state.reminderMinute),
                 tasks = state.tasks.filter { it.isNotBlank() },
-                imagePath = state.imagePath
+                imagePath = imagePath
             )
 
             val result = habitRepository.createHabit(input)
@@ -119,7 +144,7 @@ class CreateHabitViewModel(
         }
     }
 
-    private fun validate(state: CreateHabitFormState): Boolean {
+    private fun validateSync(state: CreateHabitFormState): Boolean {
         var valid = true
         if (state.name.isBlank()) {
             _formState.update { it.copy(nameError = "Name is required") }
@@ -137,11 +162,23 @@ class CreateHabitViewModel(
         return valid
     }
 
+    private suspend fun copyImageToPrivateStorage(uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val dir = File(application.filesDir, "habit_images").also { it.mkdirs() }
+            val dest = File(dir, "habit_${UUID.randomUUID()}.jpg")
+            application.contentResolver.openInputStream(uri)?.use { input ->
+                dest.outputStream().use { output -> input.copyTo(output) }
+            }
+            dest.absolutePath
+        }.getOrNull()
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as BricksApp
                 CreateHabitViewModel(
+                    application = app,
                     habitRepository = app.habitRepository,
                     reminderScheduler = app.reminderScheduler
                 )

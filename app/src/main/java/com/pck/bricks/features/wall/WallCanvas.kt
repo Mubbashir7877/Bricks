@@ -38,7 +38,9 @@ fun WallCanvas(
 
     val cols = layout.columns
     val rows = layout.rows
-    val aspectRatio = cols.toFloat() / rows
+    // Bricks are wide horizontal rectangles; canvas aspect ratio follows from brick shape
+    val brickAr = 2.5f
+    val aspectRatio = cols * brickAr / rows
 
     Canvas(
         modifier = modifier
@@ -52,7 +54,8 @@ fun WallCanvas(
 
         for (brick in wallModel.bricks) {
             val col = brick.index % cols
-            val row = brick.index / cols
+            // Build bottom-up: index 0 is bottom-left, rows fill upward
+            val row = rows - 1 - (brick.index / cols)
 
             val scale = if (brick.index == newlyAdded) animScale else 1f
             val scaledW = (brickW - mortarPx) * scale

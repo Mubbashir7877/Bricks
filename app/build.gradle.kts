@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.pck.bricks"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.pck.bricks"
-        minSdk = 36
-        targetSdk = 36
+        minSdk = 35
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.work.runtime.ktx)
     implementation(libs.navigation.compose)
+    implementation(libs.coil.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -36,4 +36,6 @@ interface HabitRepository {
 
     suspend fun getDayRecord(habitId: String, date: LocalDate): HabitDayRecord?
     suspend fun upsertDayRecord(record: HabitDayRecord)
+
+    suspend fun updateHabitImage(habitId: String, imagePath: String?)
 }
