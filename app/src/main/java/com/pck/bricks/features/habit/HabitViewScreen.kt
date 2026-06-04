@@ -159,6 +159,10 @@ private fun HabitContent(
 
         when (uiState.screenState) {
             HabitScreenState.Checklist -> {
+                uiState.wallRenderModel?.let { wallModel ->
+                    WallWithImageButton(wallModel = wallModel, onPickImage = onPickImage)
+                    Spacer(Modifier.height(16.dp))
+                }
                 TaskChecklist(
                     tasks = uiState.tasks,
                     completedIds = uiState.completedTaskIds,
