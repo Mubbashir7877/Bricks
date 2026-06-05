@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.pck.bricks.BricksApp
 import com.pck.bricks.features.notifications.NotificationBuilder
+import java.time.LocalDate
 
 class ReminderWorker(
     context: Context,
@@ -15,6 +16,11 @@ class ReminderWorker(
         val habitName = inputData.getString(KEY_HABIT_NAME) ?: return Result.failure()
         val habitId   = inputData.getString(KEY_HABIT_ID)   ?: return Result.failure()
         val app = applicationContext as? BricksApp ?: return Result.failure()
+
+        // Skip reminder if the habit was already completed today
+        val progress = app.habitRepository.getProgressOnce(habitId)
+        if (progress?.lastCompletedDate == LocalDate.now()) return Result.success()
+
         app.notificationBuilder.showReminder(
             habitName = habitName,
             notifId = NotificationBuilder.NOTIF_BASE_REMINDER + habitId.hashCode()

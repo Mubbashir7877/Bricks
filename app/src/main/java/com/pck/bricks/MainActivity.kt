@@ -8,6 +8,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,16 +34,46 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
         enableEdgeToEdge()
         setContent {
             BricksTheme {
+                var showNotifRationale by remember { mutableStateOf(false) }
+
+                LaunchedEffect(Unit) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                            showNotifRationale = true
+                        } else {
+                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
+
+                if (showNotifRationale) {
+                    AlertDialog(
+                        onDismissRequest = { showNotifRationale = false },
+                        title = { Text("Stay on track") },
+                        text = {
+                            Text(
+                                "Bricks sends a daily reminder for each habit so you never " +
+                                    "forget to log your progress. Allow notifications to get " +
+                                    "the most out of the app."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showNotifRationale = false
+                                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }) { Text("Allow") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showNotifRationale = false }) { Text("Not now") }
+                        }
+                    )
+                }
+
                 val navController = rememberNavController()
                 NavHost(
                     navController = navController,

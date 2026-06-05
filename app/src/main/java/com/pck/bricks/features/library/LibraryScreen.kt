@@ -1,6 +1,8 @@
 package com.pck.bricks.features.library
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,7 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -28,11 +34,16 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,6 +59,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.pck.bricks.core.model.TierType
 import com.pck.bricks.core.navigation.Screen
+import com.pck.bricks.features.habit.HabitDetailPane
 import com.pck.bricks.features.wall.BrickLayoutCalculator
 import java.io.File
 
@@ -80,44 +92,100 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Bricks", fontWeight = FontWeight.Bold) })
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate(Screen.CreateHabit.route) }) {
-                Icon(Icons.Default.Add, contentDescription = "Create habit")
+    // Close panel if all habits disappear (e.g. last habit deleted while panel open)
+    LaunchedEffect(uiState.habits.size) {
+        if (uiState.habits.isEmpty()) selectedIndex = null
+    }
+
+    BackHandler(enabled = selectedIndex != null) { selectedIndex = null }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(title = { Text("Bricks", fontWeight = FontWeight.Bold) })
+            },
+            floatingActionButton = {
+                FloatingActionButton(onClick = { navController.navigate(Screen.CreateHabit.route) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Create habit")
+                }
             }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            when {
-                uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                uiState.habits.isEmpty() -> EmptyLibrary(
-                    modifier = Modifier.align(Alignment.Center),
-                    onCreateClick = { navController.navigate(Screen.CreateHabit.route) }
-                )
-                else -> LazyVerticalGrid(
-                    // Spec §15.2: 3 cards across
-                    columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(uiState.habits, key = { it.habit.habitId }) { item ->
-                        HabitCard(
-                            item = item,
-                            onClick = {
-                                navController.navigate(Screen.HabitView.createRoute(item.habit.habitId))
-                            }
-                        )
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                when {
+                    uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    uiState.habits.isEmpty() -> EmptyLibrary(
+                        modifier = Modifier.align(Alignment.Center),
+                        onCreateClick = { navController.navigate(Screen.CreateHabit.route) }
+                    )
+                    else -> LazyVerticalGrid(
+                        // Spec §15.2: 3 cards across
+                        columns = GridCells.Fixed(3),
+                        contentPadding = PaddingValues(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(uiState.habits, key = { _, it -> it.habit.habitId }) { index, item ->
+                            HabitCard(
+                                item = item,
+                                onClick = { selectedIndex = index }
+                            )
+                        }
                     }
                 }
+            }
+        }
+
+        // Habit detail overlay panel — shown above Scaffold (including TopAppBar)
+        val idx = selectedIndex
+        if (idx != null && uiState.habits.isNotEmpty()) {
+            HabitOverlayPanel(
+                habits = uiState.habits,
+                initialIndex = idx.coerceIn(0, uiState.habits.lastIndex),
+                onDismiss = { selectedIndex = null }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HabitOverlayPanel(
+    habits: List<LibraryCardItem>,
+    initialIndex: Int,
+    onDismiss: () -> Unit
+) {
+    val pagerState = rememberPagerState(initialPage = initialIndex) { habits.size }
+
+    // Scrim — tapping the 10% margins on either side dismisses the panel
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.45f))
+            .clickable(onClick = onDismiss)
+    ) {
+        // 80% panel — centered; HorizontalPager inside naturally consumes pointer events
+        // so taps/swipes on the panel do not propagate to the scrim behind it
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(0.82f)
+                .align(Alignment.Center),
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 8.dp
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                HabitDetailPane(
+                    habitId = habits[page].habit.habitId,
+                    onDismiss = onDismiss
+                )
             }
         }
     }
