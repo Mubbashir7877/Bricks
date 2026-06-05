@@ -1,8 +1,10 @@
 package com.pck.bricks.features.wall.animation
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -23,6 +25,25 @@ fun rememberBrickLayScale(trigger: Int?): Animatable<Float, *> {
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessMedium
                 )
+            )
+        }
+    }
+    return animatable
+}
+
+/**
+ * Returns an [Animatable] progressing 0→1 linearly over 700ms whenever [trigger] becomes
+ * non-null. Used by WallCanvas to drive the mortar particle burst.
+ */
+@Composable
+fun rememberParticleProgress(trigger: Int?): Animatable<Float, *> {
+    val animatable = remember { Animatable(1f) }
+    LaunchedEffect(trigger) {
+        if (trigger != null) {
+            animatable.snapTo(0f)
+            animatable.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 700, easing = LinearEasing)
             )
         }
     }
