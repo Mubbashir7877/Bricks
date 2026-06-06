@@ -18,6 +18,7 @@ object HabitMapper {
         selectedWeekdays = parseWeekdays(entity.selectedWeekdaysCsv),
         reminderTime = LocalTime.ofSecondOfDay(entity.reminderTimeMinutes * 60L),
         imagePath = entity.imagePath,
+        soundPath = entity.soundPath,
         createdAt = Instant.ofEpochMilli(entity.createdAtEpochMillis),
         isActive = entity.isActive
     )
@@ -29,6 +30,7 @@ object HabitMapper {
         selectedWeekdaysCsv = domain.selectedWeekdays.joinToString(",") { it.value.toString() },
         reminderTimeMinutes = domain.reminderTime.toSecondOfDay() / 60,
         imagePath = domain.imagePath,
+        soundPath = domain.soundPath,
         createdAtEpochMillis = domain.createdAt.toEpochMilli(),
         isActive = domain.isActive
     )

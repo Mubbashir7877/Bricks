@@ -52,8 +52,11 @@ class NotificationBuilder(private val context: Context) {
 
     private fun createChannels() {
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_REMINDER, "Habit Reminders", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Daily reminders to complete your habit tasks" }
+            NotificationChannel(CHANNEL_REMINDER, "Habit Reminders", NotificationManager.IMPORTANCE_HIGH)
+                .apply {
+                    description = "Daily reminders to complete your habit tasks"
+                    setSound(null, null)
+                }
         )
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_MISSED, "Missed Day Alerts", NotificationManager.IMPORTANCE_DEFAULT)

@@ -54,6 +54,7 @@ class LocalHabitRepository(
                 selectedWeekdaysCsv = input.selectedWeekdays.joinToString(",") { it.value.toString() },
                 reminderTimeMinutes = input.reminderTime.toSecondOfDay() / 60,
                 imagePath = input.imagePath,
+                soundPath = null,
                 createdAtEpochMillis = now.toEpochMilli(),
                 isActive = true
             )
@@ -217,6 +218,10 @@ class LocalHabitRepository(
 
     override suspend fun updateHabitImage(habitId: String, imagePath: String?) {
         habitDao.updateImagePath(habitId, imagePath)
+    }
+
+    override suspend fun updateHabitSound(habitId: String, soundPath: String?) {
+        habitDao.updateSoundPath(habitId, soundPath)
     }
 
     private fun bricksForTier(tier: TierType): Int = when (tier) {

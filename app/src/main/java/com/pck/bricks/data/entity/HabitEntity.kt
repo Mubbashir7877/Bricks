@@ -11,6 +11,7 @@ data class HabitEntity(
     val selectedWeekdaysCsv: String,
     val reminderTimeMinutes: Int,
     val imagePath: String?,
+    val soundPath: String?,
     val createdAtEpochMillis: Long,
     val isActive: Boolean
 )

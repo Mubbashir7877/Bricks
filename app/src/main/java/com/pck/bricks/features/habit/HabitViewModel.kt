@@ -1,6 +1,7 @@
 package com.pck.bricks.features.habit
 
 import android.app.Application
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -23,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -57,6 +59,11 @@ class HabitViewModel(
 
     private val today: LocalDate = LocalDate.now()
     private val _animatingBrickIndex = MutableStateFlow<Int?>(null)
+
+    private val _soundPickError = MutableStateFlow<String?>(null)
+    val soundPickError: StateFlow<String?> = _soundPickError.asStateFlow()
+
+    fun clearSoundError() { _soundPickError.value = null }
 
     // Combine _animatingBrickIndex with a refresh counter so lockDay() can fire both atomically
     private val _refresh = MutableStateFlow(0)
@@ -129,6 +136,49 @@ class HabitViewModel(
             oldPath?.let { runCatching { File(it).delete() } }
             habitRepository.updateHabitImage(habitId, newPath)
         }
+    }
+
+    fun onSoundSelected(uri: Uri) {
+        viewModelScope.launch {
+            val durationMs = getSoundDurationMs(uri)
+            if (durationMs == null || durationMs > 30_000L) {
+                _soundPickError.value = "Sound must be 30 seconds or less"
+                return@launch
+            }
+            val oldPath = uiState.value.habit?.soundPath
+            val newPath = copySoundToPrivateStorage(uri) ?: return@launch
+            oldPath?.let { runCatching { File(it).delete() } }
+            habitRepository.updateHabitSound(habitId, newPath)
+        }
+    }
+
+    fun onSoundRemoved() {
+        viewModelScope.launch {
+            val oldPath = uiState.value.habit?.soundPath ?: return@launch
+            runCatching { File(oldPath).delete() }
+            habitRepository.updateHabitSound(habitId, null)
+        }
+    }
+
+    private suspend fun getSoundDurationMs(uri: Uri): Long? = withContext(Dispatchers.IO) {
+        runCatching {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(application, uri)
+            val ms = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            retriever.release()
+            ms
+        }.getOrNull()
+    }
+
+    private suspend fun copySoundToPrivateStorage(uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val dir = File(application.filesDir, "habit_sounds").also { it.mkdirs() }
+            val dest = File(dir, "sound_${UUID.randomUUID()}.mp3")
+            application.contentResolver.openInputStream(uri)?.use { input ->
+                dest.outputStream().use { output -> input.copyTo(output) }
+            }
+            dest.absolutePath
+        }.getOrNull()
     }
 
     private suspend fun copyImageToPrivateStorage(uri: Uri): String? = withContext(Dispatchers.IO) {

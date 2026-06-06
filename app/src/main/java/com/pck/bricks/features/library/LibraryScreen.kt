@@ -3,7 +3,9 @@ package com.pck.bricks.features.library
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.pck.bricks.core.model.TierStatus
 import com.pck.bricks.core.model.TierType
 import com.pck.bricks.core.navigation.Screen
 import com.pck.bricks.features.habit.HabitDetailPane
@@ -83,6 +86,18 @@ private fun tierLabel(tier: TierType?): String = when (tier) {
     TierType.SILVER -> "Routine"
     TierType.GOLD   -> "LifeStyle"
     null            -> ""
+}
+
+// Returns the tier whose border color should frame the card.
+// No border only at the very start of Bronze. Once a tier is completed the border
+// persists as the "previous tier" border until the next tier is also completed.
+private fun activeBorderTier(tier: TierType?, status: TierStatus?): TierType? {
+    if (tier == null || status == null) return null
+    return when (tier) {
+        TierType.BRONZE -> if (status == TierStatus.COMPLETED) TierType.BRONZE else null
+        TierType.SILVER -> if (status == TierStatus.COMPLETED) TierType.SILVER else TierType.BRONZE
+        TierType.GOLD   -> if (status == TierStatus.COMPLETED) TierType.GOLD else TierType.SILVER
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,7 +181,11 @@ private fun HabitOverlayPanel(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(onClick = onDismiss)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss
+            )
     ) {
         // 80% panel — centered; HorizontalPager inside naturally consumes pointer events
         // so taps/swipes on the panel do not propagate to the scrim behind it
@@ -193,10 +212,19 @@ private fun HabitOverlayPanel(
 
 @Composable
 private fun HabitCard(item: LibraryCardItem, onClick: () -> Unit) {
+    val borderTier = activeBorderTier(item.progress?.currentTier, item.progress?.tierStatus)
+    val cardShape = MaterialTheme.shapes.medium
     Card(
         onClick = onClick,
         modifier = Modifier
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .then(
+                if (borderTier != null)
+                    Modifier.border(2.dp, tierColor(borderTier), cardShape)
+                else
+                    Modifier
+            ),
+        shape = cardShape,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {

@@ -3,7 +3,7 @@ package com.pck.bricks.features.habit
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,18 +13,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,9 +43,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pck.bricks.core.model.HabitProgress
 import com.pck.bricks.core.model.HabitTask
@@ -58,6 +62,24 @@ private val bronzeColor = Color(0xFFB85C3C)
 private val silverColor = Color(0xFF787878)
 private val goldColor   = Color(0xFFC9A227)
 
+private fun activeBorderTier(tier: TierType, status: TierStatus): TierType? = when (tier) {
+    TierType.BRONZE -> if (status == TierStatus.COMPLETED) TierType.BRONZE else null
+    TierType.SILVER -> if (status == TierStatus.COMPLETED) TierType.SILVER else TierType.BRONZE
+    TierType.GOLD   -> if (status == TierStatus.COMPLETED) TierType.GOLD else TierType.SILVER
+}
+
+private fun tierColor(tier: TierType) = when (tier) {
+    TierType.BRONZE -> bronzeColor
+    TierType.SILVER -> silverColor
+    TierType.GOLD   -> goldColor
+}
+
+private fun tierLabel(tier: TierType) = when (tier) {
+    TierType.BRONZE -> "Habit"
+    TierType.SILVER -> "Routine"
+    TierType.GOLD   -> "LifeStyle"
+}
+
 @Composable
 fun HabitDetailPane(
     habitId: String,
@@ -68,11 +90,17 @@ fun HabitDetailPane(
         factory = HabitViewModel.factory(habitId)
     )
     val uiState by viewModel.uiState.collectAsState()
+    val soundPickError by viewModel.soundPickError.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { viewModel.onImageSelected(it) } }
+
+    val soundPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { viewModel.onSoundSelected(it) } }
 
     if (showDeleteDialog && uiState.habit != null) {
         AlertDialog(
@@ -90,8 +118,18 @@ fun HabitDetailPane(
         )
     }
 
+    if (soundPickError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearSoundError() },
+            title = { Text("Sound too long") },
+            text = { Text(soundPickError!!) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearSoundError() }) { Text("OK") }
+            }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // Compact panel header — name + delete + close
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,6 +144,38 @@ fun HabitDetailPane(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Default.Settings, contentDescription = "Habit settings")
+                }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Change image") },
+                        onClick = {
+                            showMenu = false
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Change sound") },
+                        onClick = {
+                            showMenu = false
+                            soundPickerLauncher.launch("audio/*")
+                        }
+                    )
+                    if (uiState.habit?.soundPath != null) {
+                        DropdownMenuItem(
+                            text = { Text("Remove sound") },
+                            onClick = {
+                                showMenu = false
+                                viewModel.onSoundRemoved()
+                            }
+                        )
+                    }
+                }
+            }
             IconButton(onClick = { showDeleteDialog = true }) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete habit")
             }
@@ -122,12 +192,7 @@ fun HabitDetailPane(
                 else -> PaneContent(
                     uiState = uiState,
                     onTaskChecked = viewModel::onTaskChecked,
-                    onFortify = viewModel::onFortifyClicked,
-                    onPickImage = {
-                        imagePickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    }
+                    onFortify = viewModel::onFortifyClicked
                 )
             }
         }
@@ -138,8 +203,7 @@ fun HabitDetailPane(
 private fun PaneContent(
     uiState: HabitViewUiState,
     onTaskChecked: (String) -> Unit,
-    onFortify: () -> Unit,
-    onPickImage: () -> Unit
+    onFortify: () -> Unit
 ) {
     val progress = uiState.progress ?: return
     Column(
@@ -154,7 +218,7 @@ private fun PaneContent(
         when (uiState.screenState) {
             HabitScreenState.Checklist -> {
                 uiState.wallRenderModel?.let { wallModel ->
-                    PaneWallWithImageButton(wallModel = wallModel, onPickImage = onPickImage)
+                    WallWithTierFrame(wallModel = wallModel, progress = progress)
                     Spacer(Modifier.height(16.dp))
                 }
                 PaneTaskChecklist(
@@ -169,8 +233,7 @@ private fun PaneContent(
                         progress = progress,
                         tasks = uiState.tasks,
                         wallModel = wallModel,
-                        onFortify = onFortify,
-                        onPickImage = onPickImage
+                        onFortify = onFortify
                     )
                 }
             }
@@ -184,7 +247,7 @@ private fun PaneContent(
                 )
                 Spacer(Modifier.height(16.dp))
                 uiState.wallRenderModel?.let { wallModel ->
-                    PaneWallWithImageButton(wallModel = wallModel, onPickImage = onPickImage)
+                    WallWithTierFrame(wallModel = wallModel, progress = progress)
                 }
             }
         }
@@ -215,18 +278,41 @@ private fun PaneTierHeader(progress: HabitProgress) {
 }
 
 @Composable
-private fun PaneWallWithImageButton(wallModel: WallRenderModel, onPickImage: () -> Unit) {
-    Box {
+private fun WallWithTierFrame(wallModel: WallRenderModel, progress: HabitProgress) {
+    val borderTier = activeBorderTier(progress.currentTier, progress.tierStatus)
+    if (borderTier == null) {
         WallCanvas(wallModel = wallModel, modifier = Modifier.fillMaxWidth())
-        IconButton(
-            onClick = onPickImage,
+        return
+    }
+    val borderColor = tierColor(borderTier)
+    val label = tierLabel(borderTier)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(3.dp, borderColor, RoundedCornerShape(8.dp))
+            .padding(top = 4.dp, start = 4.dp, end = 4.dp)
+    ) {
+        WallCanvas(wallModel = wallModel, modifier = Modifier.fillMaxWidth())
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 6.dp),
+            color = borderColor.copy(alpha = 0.4f),
+            thickness = 1.dp
+        )
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(6.dp)
-                .size(32.dp)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f), CircleShape)
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Add or replace image", modifier = Modifier.size(18.dp))
+            Text(
+                text = label,
+                color = borderColor,
+                fontFamily = FontFamily.Serif,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                letterSpacing = 4.sp
+            )
         }
     }
 }
@@ -252,10 +338,9 @@ private fun PaneCompletedView(
     progress: HabitProgress,
     tasks: List<HabitTask>,
     wallModel: WallRenderModel,
-    onFortify: () -> Unit,
-    onPickImage: () -> Unit
+    onFortify: () -> Unit
 ) {
-    PaneWallWithImageButton(wallModel = wallModel, onPickImage = onPickImage)
+    WallWithTierFrame(wallModel = wallModel, progress = progress)
     Spacer(Modifier.height(16.dp))
 
     if (progress.tierStatus == TierStatus.COMPLETED) {

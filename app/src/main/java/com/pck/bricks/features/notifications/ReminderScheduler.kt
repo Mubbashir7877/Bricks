@@ -30,7 +30,8 @@ class WorkManagerReminderScheduler(private val context: Context) : ReminderSched
             .setInputData(
                 workDataOf(
                     ReminderWorker.KEY_HABIT_ID   to habit.habitId,
-                    ReminderWorker.KEY_HABIT_NAME to habit.name
+                    ReminderWorker.KEY_HABIT_NAME to habit.name,
+                    ReminderWorker.KEY_SOUND_PATH to habit.soundPath
                 )
             )
             .addTag(TAG)

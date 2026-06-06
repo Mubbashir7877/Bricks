@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.pck.bricks.data.dao.HabitDao
 import com.pck.bricks.data.dao.HabitDayRecordDao
 import com.pck.bricks.data.dao.HabitProgressDao
@@ -23,7 +25,7 @@ import com.pck.bricks.data.entity.TaskCompletionEntity
         HabitDayRecordEntity::class,
         TaskCompletionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class BricksDatabase : RoomDatabase() {
@@ -37,13 +39,21 @@ abstract class BricksDatabase : RoomDatabase() {
     companion object {
         @Volatile private var INSTANCE: BricksDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE habits ADD COLUMN soundPath TEXT")
+            }
+        }
+
         fun getInstance(context: Context): BricksDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     BricksDatabase::class.java,
                     "bricks.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build().also { INSTANCE = it }
             }
     }
 }

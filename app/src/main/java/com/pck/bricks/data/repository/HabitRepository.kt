@@ -38,4 +38,5 @@ interface HabitRepository {
     suspend fun upsertDayRecord(record: HabitDayRecord)
 
     suspend fun updateHabitImage(habitId: String, imagePath: String?)
+    suspend fun updateHabitSound(habitId: String, soundPath: String?)
 }

@@ -11,6 +11,7 @@ data class Habit(
     val selectedWeekdays: Set<DayOfWeek>,
     val reminderTime: LocalTime,
     val imagePath: String?,
+    val soundPath: String?,
     val createdAt: Instant,
     val isActive: Boolean
 )

@@ -27,4 +27,7 @@ interface HabitDao {
 
     @Query("UPDATE habits SET imagePath = :imagePath WHERE habitId = :habitId")
     suspend fun updateImagePath(habitId: String, imagePath: String?)
+
+    @Query("UPDATE habits SET soundPath = :soundPath WHERE habitId = :habitId")
+    suspend fun updateSoundPath(habitId: String, soundPath: String?)
 }
