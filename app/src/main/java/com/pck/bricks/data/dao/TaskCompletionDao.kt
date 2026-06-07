@@ -22,4 +22,7 @@ interface TaskCompletionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(record: TaskCompletionEntity)
+
+    @Query("DELETE FROM task_completions WHERE habitId = :habitId")
+    suspend fun deleteAllForHabit(habitId: String)
 }

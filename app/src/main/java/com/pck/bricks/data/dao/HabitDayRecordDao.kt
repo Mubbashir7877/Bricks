@@ -29,4 +29,7 @@ interface HabitDayRecordDao {
         "WHERE habitId = :habitId AND dateEpochDay = :dateEpochDay"
     )
     suspend fun markCompleted(habitId: String, dateEpochDay: Long, brickIndex: Int)
+
+    @Query("DELETE FROM habit_day_records WHERE habitId = :habitId")
+    suspend fun deleteAllForHabit(habitId: String)
 }

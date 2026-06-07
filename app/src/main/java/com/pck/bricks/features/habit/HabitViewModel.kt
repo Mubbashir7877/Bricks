@@ -12,6 +12,7 @@ import com.pck.bricks.BricksApp
 import com.pck.bricks.core.model.Habit
 import com.pck.bricks.core.model.HabitProgress
 import com.pck.bricks.core.model.HabitTask
+import com.pck.bricks.core.model.ScheduleType
 import com.pck.bricks.core.time.ScheduledDayCalculator
 import com.pck.bricks.data.repository.HabitRepository
 import com.pck.bricks.features.notifications.ReminderScheduler
@@ -31,10 +32,25 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.util.UUID
 
 enum class HabitScreenState { Checklist, CompletedLocked, NotScheduled }
+
+data class EditHabitFormState(
+    val name: String = "",
+    val scheduleType: ScheduleType = ScheduleType.DAILY,
+    val selectedWeekdays: Set<DayOfWeek> = emptySet(),
+    val reminderHour: Int = 8,
+    val reminderMinute: Int = 0,
+    val tasks: List<String> = listOf(""),
+    val nameError: String? = null,
+    val weekdaysError: String? = null,
+    val tasksError: String? = null,
+    val isSaving: Boolean = false
+)
 
 data class HabitViewUiState(
     val habit: Habit? = null,
@@ -63,7 +79,111 @@ class HabitViewModel(
     private val _soundPickError = MutableStateFlow<String?>(null)
     val soundPickError: StateFlow<String?> = _soundPickError.asStateFlow()
 
+    private val _editFormState = MutableStateFlow<EditHabitFormState?>(null)
+    val editFormState: StateFlow<EditHabitFormState?> = _editFormState.asStateFlow()
+
     fun clearSoundError() { _soundPickError.value = null }
+
+    // ── Edit habit ──────────────────────────────────────────────────────────
+
+    fun openEditForm() {
+        val habit = uiState.value.habit ?: return
+        _editFormState.value = EditHabitFormState(
+            name = habit.name,
+            scheduleType = habit.scheduleType,
+            selectedWeekdays = habit.selectedWeekdays,
+            reminderHour = habit.reminderTime.hour,
+            reminderMinute = habit.reminderTime.minute,
+            tasks = uiState.value.tasks.map { it.taskName }.ifEmpty { listOf("") }
+        )
+    }
+
+    fun closeEditForm() { _editFormState.value = null }
+
+    fun onEditNameChange(v: String) =
+        _editFormState.update { it?.copy(name = v, nameError = null) }
+
+    fun onEditScheduleTypeChange(t: ScheduleType) =
+        _editFormState.update { it?.copy(scheduleType = t, weekdaysError = null) }
+
+    fun onEditWeekdayToggle(day: DayOfWeek) = _editFormState.update { s ->
+        s?.let {
+            val days = if (day in it.selectedWeekdays) it.selectedWeekdays - day else it.selectedWeekdays + day
+            it.copy(selectedWeekdays = days, weekdaysError = null)
+        }
+    }
+
+    fun onEditTimeChange(hour: Int, minute: Int) =
+        _editFormState.update { it?.copy(reminderHour = hour, reminderMinute = minute) }
+
+    fun onEditTaskChange(index: Int, value: String) = _editFormState.update { s ->
+        s?.let { it.copy(tasks = it.tasks.toMutableList().also { l -> l[index] = value }, tasksError = null) }
+    }
+
+    fun onEditAddTask() = _editFormState.update { it?.copy(tasks = it.tasks + "") }
+
+    fun onEditRemoveTask(index: Int) = _editFormState.update { s ->
+        s?.let { if (it.tasks.size <= 1) it else it.copy(tasks = it.tasks.filterIndexed { i, _ -> i != index }) }
+    }
+
+    fun onSaveEdit(onDone: () -> Unit) {
+        val form = _editFormState.value ?: return
+        if (!validateEditForm(form)) return
+        viewModelScope.launch {
+            _editFormState.update { it?.copy(isSaving = true) }
+            val trimmedName = form.name.trim()
+            val duplicate = habitRepository.getActiveHabitsOnce()
+                .any { it.habitId != habitId && it.name.trim().equals(trimmedName, ignoreCase = true) }
+            if (duplicate) {
+                _editFormState.update { it?.copy(isSaving = false, nameError = "A habit with this name already exists") }
+                return@launch
+            }
+            val reminderTime = LocalTime.of(form.reminderHour, form.reminderMinute)
+            habitRepository.updateHabit(
+                habitId = habitId,
+                name = trimmedName,
+                scheduleType = form.scheduleType,
+                selectedWeekdays = form.selectedWeekdays,
+                reminderTime = reminderTime,
+                tasks = form.tasks.filter { it.isNotBlank() }
+            )
+            uiState.value.habit?.let { existing ->
+                reminderScheduler.scheduleHabitReminder(
+                    existing.copy(
+                        name = trimmedName,
+                        scheduleType = form.scheduleType,
+                        selectedWeekdays = form.selectedWeekdays,
+                        reminderTime = reminderTime
+                    )
+                )
+            }
+            _editFormState.update { it?.copy(isSaving = false) }
+            onDone()
+        }
+    }
+
+    private fun validateEditForm(form: EditHabitFormState): Boolean {
+        var valid = true
+        if (form.name.isBlank()) {
+            _editFormState.update { it?.copy(nameError = "Name is required") }
+            valid = false
+        }
+        if (form.scheduleType == ScheduleType.SPECIFIC_WEEKDAYS && form.selectedWeekdays.isEmpty()) {
+            _editFormState.update { it?.copy(weekdaysError = "Select at least one day") }
+            valid = false
+        }
+        if (form.tasks.none { it.isNotBlank() }) {
+            _editFormState.update { it?.copy(tasksError = "Add at least one task") }
+            valid = false
+        }
+        return valid
+    }
+
+    // ── Reset progress ──────────────────────────────────────────────────────
+
+    fun onResetConfirmed() {
+        viewModelScope.launch { habitRepository.resetHabitProgress(habitId) }
+    }
 
     // Combine _animatingBrickIndex with a refresh counter so lockDay() can fire both atomically
     private val _refresh = MutableStateFlow(0)

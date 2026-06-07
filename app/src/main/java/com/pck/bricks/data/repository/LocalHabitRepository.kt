@@ -5,6 +5,7 @@ import com.pck.bricks.core.model.Habit
 import com.pck.bricks.core.model.HabitDayRecord
 import com.pck.bricks.core.model.HabitProgress
 import com.pck.bricks.core.model.HabitTask
+import com.pck.bricks.core.model.ScheduleType
 import com.pck.bricks.core.model.TaskCompletionRecord
 import com.pck.bricks.core.model.TierStatus
 import com.pck.bricks.core.model.TierType
@@ -23,8 +24,10 @@ import com.pck.bricks.data.mapper.HabitMapper
 import com.pck.bricks.data.mapper.ProgressMapper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.util.UUID
 
 class LocalHabitRepository(
@@ -222,6 +225,56 @@ class LocalHabitRepository(
 
     override suspend fun updateHabitSound(habitId: String, soundPath: String?) {
         habitDao.updateSoundPath(habitId, soundPath)
+    }
+
+    override suspend fun updateHabit(
+        habitId: String,
+        name: String,
+        scheduleType: ScheduleType,
+        selectedWeekdays: Set<DayOfWeek>,
+        reminderTime: LocalTime,
+        tasks: List<String>
+    ) {
+        habitDao.updateHabitDetails(
+            habitId = habitId,
+            name = name.trim(),
+            scheduleType = scheduleType.name,
+            weekdaysCsv = selectedWeekdays.joinToString(",") { it.value.toString() },
+            reminderMins = reminderTime.toSecondOfDay() / 60
+        )
+        habitTaskDao.deleteAllForHabit(habitId)
+        habitTaskDao.insertAll(
+            tasks.filter { it.isNotBlank() }.mapIndexed { index, taskName ->
+                HabitTaskEntity(
+                    taskId = UUID.randomUUID().toString(),
+                    habitId = habitId,
+                    taskName = taskName.trim(),
+                    sortOrder = index
+                )
+            }
+        )
+    }
+
+    override suspend fun resetHabitProgress(habitId: String) {
+        val today = LocalDate.now()
+        val existing = habitProgressDao.getProgress(habitId)
+        habitProgressDao.insert(
+            HabitProgressEntity(
+                progressId = existing?.progressId ?: UUID.randomUUID().toString(),
+                habitId = habitId,
+                currentTier = TierType.BRONZE.name,
+                totalBricksRequired = 30,
+                completedBrickCount = 0,
+                missedGapCount = 0,
+                consecutiveMissedScheduledDays = 0,
+                currentWallStartDateEpochDay = today.toEpochDay(),
+                lastProcessedDateEpochDay = null,
+                lastCompletedDateEpochDay = null,
+                tierStatus = TierStatus.ACTIVE.name
+            )
+        )
+        habitDayRecordDao.deleteAllForHabit(habitId)
+        taskCompletionDao.deleteAllForHabit(habitId)
     }
 
     private fun bricksForTier(tier: TierType): Int = when (tier) {

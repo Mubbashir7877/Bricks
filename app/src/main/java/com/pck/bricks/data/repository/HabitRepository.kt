@@ -5,9 +5,12 @@ import com.pck.bricks.core.model.Habit
 import com.pck.bricks.core.model.HabitDayRecord
 import com.pck.bricks.core.model.HabitProgress
 import com.pck.bricks.core.model.HabitTask
+import com.pck.bricks.core.model.ScheduleType
 import com.pck.bricks.core.model.TaskCompletionRecord
 import kotlinx.coroutines.flow.Flow
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 
 interface HabitRepository {
 
@@ -39,4 +42,6 @@ interface HabitRepository {
 
     suspend fun updateHabitImage(habitId: String, imagePath: String?)
     suspend fun updateHabitSound(habitId: String, soundPath: String?)
+    suspend fun updateHabit(habitId: String, name: String, scheduleType: ScheduleType, selectedWeekdays: Set<DayOfWeek>, reminderTime: LocalTime, tasks: List<String>)
+    suspend fun resetHabitProgress(habitId: String)
 }

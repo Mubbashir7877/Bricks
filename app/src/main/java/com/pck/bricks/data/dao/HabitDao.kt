@@ -30,4 +30,11 @@ interface HabitDao {
 
     @Query("UPDATE habits SET soundPath = :soundPath WHERE habitId = :habitId")
     suspend fun updateSoundPath(habitId: String, soundPath: String?)
+
+    @Query(
+        "UPDATE habits SET name = :name, scheduleType = :scheduleType, " +
+        "selectedWeekdaysCsv = :weekdaysCsv, reminderTimeMinutes = :reminderMins " +
+        "WHERE habitId = :habitId"
+    )
+    suspend fun updateHabitDetails(habitId: String, name: String, scheduleType: String, weekdaysCsv: String, reminderMins: Int)
 }

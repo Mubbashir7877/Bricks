@@ -18,4 +18,7 @@ interface HabitTaskDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(tasks: List<HabitTaskEntity>)
+
+    @Query("DELETE FROM habit_tasks WHERE habitId = :habitId")
+    suspend fun deleteAllForHabit(habitId: String)
 }

@@ -91,7 +91,9 @@ fun HabitDetailPane(
     )
     val uiState by viewModel.uiState.collectAsState()
     val soundPickError by viewModel.soundPickError.collectAsState()
+    val editFormState by viewModel.editFormState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -126,6 +128,37 @@ fun HabitDetailPane(
             confirmButton = {
                 TextButton(onClick = { viewModel.clearSoundError() }) { Text("OK") }
             }
+        )
+    }
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("Reset Progress") },
+            text = { Text("Reset all progress for \"${uiState.habit?.name}\"? This will erase all bricks, streaks, and completed days. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onResetConfirmed(); showResetConfirm = false }) {
+                    Text("Reset", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    editFormState?.let { form ->
+        EditHabitDialog(
+            form = form,
+            onDismiss = viewModel::closeEditForm,
+            onNameChange = viewModel::onEditNameChange,
+            onScheduleTypeChange = viewModel::onEditScheduleTypeChange,
+            onWeekdayToggle = viewModel::onEditWeekdayToggle,
+            onTimeChange = viewModel::onEditTimeChange,
+            onTaskChange = viewModel::onEditTaskChange,
+            onAddTask = viewModel::onEditAddTask,
+            onRemoveTask = viewModel::onEditRemoveTask,
+            onSave = { viewModel.onSaveEdit { viewModel.closeEditForm() } }
         )
     }
 
@@ -174,6 +207,20 @@ fun HabitDetailPane(
                             }
                         )
                     }
+                    DropdownMenuItem(
+                        text = { Text("Edit habit") },
+                        onClick = {
+                            showMenu = false
+                            viewModel.openEditForm()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Reset progress", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            showMenu = false
+                            showResetConfirm = true
+                        }
+                    )
                 }
             }
             IconButton(onClick = { showDeleteDialog = true }) {
