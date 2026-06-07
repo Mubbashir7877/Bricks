@@ -73,7 +73,7 @@ fun WallCanvas(
     val cols = layout.columns
     val rows = layout.rows
     // Bricks are wide horizontal rectangles; canvas aspect ratio follows from brick shape
-    val brickAr = 2.5f
+    val brickAr = 2.0f
     val aspectRatio = cols * brickAr / rows
 
     val mapper = ImageWallMapper()
