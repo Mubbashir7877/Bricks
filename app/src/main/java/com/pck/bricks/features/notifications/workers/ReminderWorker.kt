@@ -29,7 +29,8 @@ class ReminderWorker(
 
         app.notificationBuilder.showReminder(
             habitName = habitName,
-            notifId = NotificationBuilder.NOTIF_BASE_REMINDER + habitId.hashCode()
+            notifId = NotificationBuilder.NOTIF_BASE_REMINDER + habitId.hashCode(),
+            habitId = habitId
         )
         playSound(soundPath)
         return Result.success()

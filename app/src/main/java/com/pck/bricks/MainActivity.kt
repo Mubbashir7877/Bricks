@@ -1,6 +1,7 @@
 package com.pck.bricks
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +26,7 @@ import com.pck.bricks.core.navigation.Screen
 import com.pck.bricks.features.creation.CreateHabitScreen
 import com.pck.bricks.features.habit.HabitViewScreen
 import com.pck.bricks.features.library.LibraryScreen
+import com.pck.bricks.features.notifications.NotificationBuilder
 import com.pck.bricks.ui.theme.BricksTheme
 
 class MainActivity : ComponentActivity() {
@@ -32,8 +34,17 @@ class MainActivity : ComponentActivity() {
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* result not critical */ }
 
+    private val pendingHabitId = mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingHabitId.value = intent.getStringExtra(NotificationBuilder.EXTRA_HABIT_ID)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingHabitId.value = intent.getStringExtra(NotificationBuilder.EXTRA_HABIT_ID)
         enableEdgeToEdge()
         setContent {
             BricksTheme {
@@ -75,6 +86,12 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val navController = rememberNavController()
+                val habitIdToOpen by pendingHabitId
+                LaunchedEffect(habitIdToOpen) {
+                    val id = habitIdToOpen ?: return@LaunchedEffect
+                    pendingHabitId.value = null
+                    navController.navigate(Screen.HabitView.createRoute(id))
+                }
                 NavHost(
                     navController = navController,
                     startDestination = Screen.Library.route
