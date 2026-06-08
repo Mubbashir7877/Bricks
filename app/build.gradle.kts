@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.navigation.compose)
     implementation(libs.coil.compose)
+    implementation(libs.glance.appwidget)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

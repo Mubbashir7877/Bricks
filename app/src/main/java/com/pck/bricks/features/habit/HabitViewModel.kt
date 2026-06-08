@@ -21,6 +21,7 @@ import com.pck.bricks.features.wall.BrickLayoutCalculator
 import com.pck.bricks.features.wall.BrickProgressCalculator
 import com.pck.bricks.features.wall.WallRenderModel
 import com.pck.bricks.features.wall.WallRenderer
+import com.pck.bricks.features.widget.BricksWidget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -325,6 +326,7 @@ class HabitViewModel(
         habitRepository.saveProgress(tierTransitionEngine.completeTierIfReady(updated))
         _animatingBrickIndex.value = brickIndex
         _refresh.update { it + 1 }
+        BricksWidget.refreshAll(application)
     }
 
     companion object {
