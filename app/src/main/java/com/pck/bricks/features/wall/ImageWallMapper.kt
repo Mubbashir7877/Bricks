@@ -6,16 +6,16 @@ import kotlin.math.roundToInt
 
 data class BrickSrcRect(val offset: IntOffset, val size: IntSize)
 
+private const val BRICK_AR = 2.0f  // width : height of one brick
+
 class ImageWallMapper {
 
     /**
      * Returns the source region of the image that maps to the given brick.
      *
-     * The wall is treated as a single canvas covering the whole image. Bricks fill
-     * bottom-up (index 0 = bottom-left), so the canvas row for a brick is:
-     *   canvasRow = rows - 1 - (index / cols)   (0 = top of canvas)
-     * This means the bottom of the image aligns with the first bricks placed, and
-     * the image is progressively revealed upward as the wall grows.
+     * The image is first center-cropped to the wall's natural aspect ratio
+     * (cols × brickAr / rows) so that each slice fills its brick without
+     * distortion. Bricks fill bottom-up (index 0 = bottom-left).
      */
     fun brickSrcRect(
         brickIndex: Int,
@@ -23,13 +23,36 @@ class ImageWallMapper {
         imageWidth: Int,
         imageHeight: Int
     ): BrickSrcRect {
+        // Center-crop image to the wall's aspect ratio so slices are undistorted
+        val wallAr = layout.columns.toFloat() * BRICK_AR / layout.rows
+        val imageAr = imageWidth.toFloat() / imageHeight
+
+        val cropLeft: Int
+        val cropTop: Int
+        val cropW: Int
+        val cropH: Int
+
+        if (imageAr > wallAr) {
+            // Image wider than wall — crop left/right sides
+            cropH = imageHeight
+            cropW = (imageHeight * wallAr).roundToInt()
+            cropLeft = (imageWidth - cropW) / 2
+            cropTop = 0
+        } else {
+            // Image taller than wall — crop top/bottom
+            cropW = imageWidth
+            cropH = (imageWidth / wallAr).roundToInt()
+            cropLeft = 0
+            cropTop = (imageHeight - cropH) / 2
+        }
+
         val col = brickIndex % layout.columns
         val canvasRow = layout.rows - 1 - (brickIndex / layout.columns)
 
-        val left   = (col.toFloat()         / layout.columns * imageWidth).roundToInt()
-        val top    = (canvasRow.toFloat()    / layout.rows   * imageHeight).roundToInt()
-        val right  = ((col + 1).toFloat()   / layout.columns * imageWidth).roundToInt()
-        val bottom = ((canvasRow + 1).toFloat() / layout.rows * imageHeight).roundToInt()
+        val left   = cropLeft + (col.toFloat()             / layout.columns * cropW).roundToInt()
+        val top    = cropTop  + (canvasRow.toFloat()        / layout.rows   * cropH).roundToInt()
+        val right  = cropLeft + ((col + 1).toFloat()       / layout.columns * cropW).roundToInt()
+        val bottom = cropTop  + ((canvasRow + 1).toFloat() / layout.rows   * cropH).roundToInt()
 
         return BrickSrcRect(
             offset = IntOffset(left, top),
