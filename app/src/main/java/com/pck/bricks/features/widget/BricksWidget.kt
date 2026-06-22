@@ -46,6 +46,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.pck.bricks.BricksApp
 import com.pck.bricks.MainActivity
+import com.pck.bricks.features.notifications.NotificationBuilder
 import com.pck.bricks.features.wall.BrickLayoutCalculator
 import com.pck.bricks.features.wall.WallRenderer
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,7 @@ class BricksWidget : GlanceAppWidget() {
             val currentIdx = (state[KEY_INDEX] ?: 0).coerceIn(0, (count - 1).coerceAtLeast(0))
             WidgetContent(
                 habitName    = habit?.name ?: "No habits",
+                habitId      = habit?.habitId,
                 wallBitmap   = wallBitmap,
                 currentIndex = currentIdx,
                 totalHabits  = count
@@ -140,6 +142,7 @@ class BricksWidget : GlanceAppWidget() {
 @Composable
 private fun WidgetContent(
     habitName: String,
+    habitId: String?,
     wallBitmap: Bitmap?,
     currentIndex: Int,
     totalHabits: Int
@@ -148,6 +151,7 @@ private fun WidgetContent(
     val openApp = actionStartActivity(
         Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (habitId != null) putExtra(NotificationBuilder.EXTRA_HABIT_ID, habitId)
         }
     )
 

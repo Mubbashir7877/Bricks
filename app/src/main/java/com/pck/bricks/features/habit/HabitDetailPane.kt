@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
@@ -83,7 +84,8 @@ private fun tierLabel(tier: TierType) = when (tier) {
 @Composable
 fun HabitDetailPane(
     habitId: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isFullScreen: Boolean = false
 ) {
     val viewModel: HabitViewModel = viewModel(
         key = habitId,
@@ -166,9 +168,14 @@ fun HabitDetailPane(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+                .padding(start = if (isFullScreen) 4.dp else 16.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (isFullScreen) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            }
             Text(
                 text = uiState.habit?.name ?: "",
                 style = MaterialTheme.typography.titleMedium,
@@ -226,8 +233,10 @@ fun HabitDetailPane(
             IconButton(onClick = { showDeleteDialog = true }) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete habit")
             }
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = "Close panel")
+            if (!isFullScreen) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close panel")
+                }
             }
         }
         HorizontalDivider()

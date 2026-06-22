@@ -1,18 +1,22 @@
 package com.pck.bricks.features.library
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,9 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -36,7 +37,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -62,7 +62,7 @@ import coil.compose.AsyncImage
 import com.pck.bricks.core.model.TierStatus
 import com.pck.bricks.core.model.TierType
 import com.pck.bricks.core.navigation.Screen
-import com.pck.bricks.features.habit.HabitDetailPane
+import com.pck.bricks.features.habit.AdaptiveHabitPanel
 import com.pck.bricks.features.wall.BrickLayoutCalculator
 import java.io.File
 
@@ -114,7 +114,14 @@ fun LibraryScreen(
         if (uiState.habits.isEmpty()) selectedIndex = null
     }
 
-    BackHandler(enabled = selectedIndex != null) { selectedIndex = null }
+    // Keep last-selected habitId alive during the slide-out exit animation
+    var panelHabitId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(selectedIndex) {
+        val idx = selectedIndex
+        if (idx != null && uiState.habits.isNotEmpty()) {
+            panelHabitId = uiState.habits[idx.coerceIn(0, uiState.habits.lastIndex)].habit.habitId
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -156,59 +163,19 @@ fun LibraryScreen(
             }
         }
 
-        // Habit detail overlay panel — shown above Scaffold (including TopAppBar)
-        val idx = selectedIndex
-        if (idx != null && uiState.habits.isNotEmpty()) {
-            HabitOverlayPanel(
-                habits = uiState.habits,
-                initialIndex = idx.coerceIn(0, uiState.habits.lastIndex),
-                onDismiss = { selectedIndex = null }
-            )
-        }
-    }
-}
-
-@Composable
-private fun HabitOverlayPanel(
-    habits: List<LibraryCardItem>,
-    initialIndex: Int,
-    onDismiss: () -> Unit
-) {
-    val pagerState = rememberPagerState(initialPage = initialIndex) { habits.size }
-
-    // Scrim — tapping the 10% margins on either side dismisses the panel
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onDismiss
-            )
-    ) {
-        // 80% panel — centered; HorizontalPager inside naturally consumes pointer events
-        // so taps/swipes on the panel do not propagate to the scrim behind it
-        Surface(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(0.82f)
-                .align(Alignment.Center),
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 8.dp
+        // Adaptive habit panel — slides in from right, partial or full depending on task state
+        AnimatedVisibility(
+            visible = selectedIndex != null && uiState.habits.isNotEmpty(),
+            enter = slideInHorizontally(animationSpec = tween(350)) { it } + fadeIn(tween(200)),
+            exit  = slideOutHorizontally(animationSpec = tween(300)) { it } + fadeOut(tween(200))
         ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                HabitDetailPane(
-                    habitId = habits[page].habit.habitId,
-                    onDismiss = onDismiss
-                )
+            panelHabitId?.let { id ->
+                AdaptiveHabitPanel(habitId = id, onDismiss = { selectedIndex = null })
             }
         }
     }
 }
+
 
 @Composable
 private fun HabitCard(item: LibraryCardItem, onClick: () -> Unit) {
